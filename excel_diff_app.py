@@ -1,74 +1,78 @@
-import openpyxl
-import json
 import streamlit as st
+import pandas as pd
+from openpyxl import load_workbook
 
 
-def excel_diff(original_file, user_file):
-    # Load the workbooks
-    original_wb = openpyxl.load_workbook(original_file)
-    user_wb = openpyxl.load_workbook(user_file)
+def compare_excel_sheets(original_excel_path, user_excel_path):
+    # Load both Excel files
+    original_wb = load_workbook(original_excel_path, data_only=True)
+    user_wb = load_workbook(user_excel_path, data_only=True)
 
-    differences = {}
+    # Initialize an empty list to store differences
+    differences = []
 
-    # Compare sheets
+    # Compare each sheet in both workbooks
     for sheet_name in original_wb.sheetnames:
-        if sheet_name not in user_wb.sheetnames:
-            differences[sheet_name] = {'missing_in_user_file': True}
-            continue
+        if sheet_name in user_wb.sheetnames:
+            original_sheet = original_wb[sheet_name]
+            user_sheet = user_wb[sheet_name]
 
-        original_sheet = original_wb[sheet_name]
-        user_sheet = user_wb[sheet_name]
+            # Convert sheets to DataFrames for easy comparison
+            original_df = pd.DataFrame(original_sheet.values)
+            user_df = pd.DataFrame(user_sheet.values)
 
-        sheet_diff = {
-            'added_rows': [],
-            'removed_rows': [],
-            'modified_rows': []
-        }
+            # Ensure both DataFrames have the same structure
+            max_rows = max(original_df.shape[0], user_df.shape[0])
+            max_cols = max(original_df.shape[1], user_df.shape[1])
+            original_df = original_df.reindex(index=range(max_rows), columns=range(max_cols))
+            user_df = user_df.reindex(index=range(max_rows), columns=range(max_cols))
 
-        # Get the maximum row count from both sheets
-        max_rows = max(original_sheet.max_row, user_sheet.max_row)
+            # Compare row by row and column by column
+            for row_idx in range(max_rows):
+                original_row = original_df.iloc[row_idx].fillna("").tolist()
+                user_row = user_df.iloc[row_idx].fillna("").tolist()
 
-        # Compare each row
-        for row_index in range(1, max_rows + 1):
-            original_row = [cell.value for cell in original_sheet[row_index]]
-            user_row = [cell.value for cell in user_sheet[row_index]]
+                if original_row != user_row:
+                    differences.append({
+                        "Sheet": sheet_name,
+                        "Row": row_idx + 1,
+                        "Old": original_row,
+                        "New": user_row,
+                    })
 
-            # Check if row was added, removed, or modified
-            if original_row == [None] * len(original_row) and user_row != [None] * len(user_row):
-                sheet_diff['added_rows'].append({'row': row_index, 'data': user_row})
-            elif original_row != [None] * len(original_row) and user_row == [None] * len(user_row):
-                sheet_diff['removed_rows'].append({'row': row_index, 'data': original_row})
-            elif original_row != user_row:
-                sheet_diff['modified_rows'].append({
-                    'row': row_index,
-                    'original_data': original_row,
-                    'user_data': user_row
-                })
-
-        if sheet_diff['added_rows'] or sheet_diff['removed_rows'] or sheet_diff['modified_rows']:
-            differences[sheet_name] = sheet_diff
-
-    # Check for sheets in user_file but not in original_file
-    for sheet_name in user_wb.sheetnames:
-        if sheet_name not in original_wb.sheetnames:
-            differences[sheet_name] = {'extra_in_user_file': True}
-
-    return json.dumps(differences, indent=2)
+    return differences
 
 
-# Streamlit UI
-st.title("Excel File Difference Checker")
-st.write("Upload the original and user Excel files to compare them.")
+# Streamlit interface
+st.title("Excel Sheet Difference Checker")
+st.write("Upload the original Excel file and the user-updated Excel file to compare differences.")
 
-# File upload widgets
+# Upload file inputs
 original_file = st.file_uploader("Upload Original Excel File", type=["xlsx"])
 user_file = st.file_uploader("Upload User Excel File", type=["xlsx"])
 
-# Check if both files are uploaded
+# Run comparison if both files are uploaded
 if original_file and user_file:
-    # Run the comparison function
-    diff = excel_diff(original_file, user_file)
+    st.write("Comparing files...")
 
-    # Display the results
-    st.subheader("Differences:")
-    st.json(diff)
+    # Compare the Excel files and retrieve the differences
+    differences = compare_excel_sheets(original_file, user_file)
+
+    # Display results
+    if differences:
+        st.write("### Differences Found")
+        for diff in differences:
+            st.write(f"**Sheet:** {diff['Sheet']} - **Row:** {diff['Row']}")
+
+            # Display the comparison side by side using columns
+            col1, col2 = st.columns(2)
+            with col1:
+                st.write("**Old**")
+                st.write(diff["Old"])
+            with col2:
+                st.write("**New**")
+                st.write(diff["New"])
+
+            st.write("---")
+    else:
+        st.write("No differences found between the original and user Excel files.")
