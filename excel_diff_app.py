@@ -8,8 +8,9 @@ def compare_excel_sheets(original_excel_path, user_excel_path):
     original_wb = load_workbook(original_excel_path, data_only=True)
     user_wb = load_workbook(user_excel_path, data_only=True)
 
-    # Initialize an empty list to store differences
-    differences = []
+    # Initialize lists to store different types of changes
+    boolean_changes = []
+    other_changes = []
 
     # Compare each sheet in both workbooks
     for sheet_name in original_wb.sheetnames:
@@ -33,14 +34,32 @@ def compare_excel_sheets(original_excel_path, user_excel_path):
                 user_row = user_df.iloc[row_idx].fillna("").tolist()
 
                 if original_row != user_row:
-                    differences.append({
+                    row_diff = {
                         "Sheet": sheet_name,
                         "Row": row_idx + 1,
                         "Old": original_row,
                         "New": user_row,
-                    })
+                    }
 
-    return differences
+                    # Check if changes are only true/false or other types
+                    if all(isinstance(old, bool) and isinstance(new, bool) and old != new
+                           for old, new in zip(original_row, user_row) if old != new):
+                        boolean_changes.append(row_diff)
+                    else:
+                        other_changes.append(row_diff)
+
+    return boolean_changes, other_changes
+
+
+def highlight_row_differences(old_row, new_row):
+    """Return a highlighted new row where differences are marked in green."""
+    highlighted_row = []
+    for old_val, new_val in zip(old_row, new_row):
+        if old_val != new_val:
+            highlighted_row.append(f"<span style='color: green; font-weight: bold;'>{new_val}</span>")
+        else:
+            highlighted_row.append(str(new_val))
+    return highlighted_row
 
 
 # Streamlit interface
@@ -56,23 +75,28 @@ if original_file and user_file:
     st.write("Comparing files...")
 
     # Compare the Excel files and retrieve the differences
-    differences = compare_excel_sheets(original_file, user_file)
+    boolean_changes, other_changes = compare_excel_sheets(original_file, user_file)
+
 
     # Display results
-    if differences:
-        st.write("### Differences Found")
-        for diff in differences:
-            st.write(f"**Sheet:** {diff['Sheet']} - **Row:** {diff['Row']}")
+    def display_differences(differences, change_type):
+        if differences:
+            st.write(f"### {change_type} Changes")
+            for diff in differences:
+                st.write(f"**Sheet:** {diff['Sheet']} - **Row:** {diff['Row']}")
 
-            # Display the comparison side by side using columns
-            col1, col2 = st.columns(2)
-            with col1:
-                st.write("**Old**")
-                st.write(diff["Old"])
-            with col2:
-                st.write("**New**")
-                st.write(diff["New"])
+                # Display rows in a two-row format
+                df_display = pd.DataFrame([diff["Old"], highlight_row_differences(diff["Old"], diff["New"])],
+                                          index=["Old Row", "New Row"])
+                st.write(df_display.to_html(escape=False), unsafe_allow_html=True)
 
-            st.write("---")
-    else:
-        st.write("No differences found between the original and user Excel files.")
+                st.write("---")
+        else:
+            st.write(f"No {change_type.lower()} changes found.")
+
+
+    # Display Boolean changes
+    display_differences(boolean_changes, "Boolean")
+
+    # Display Other changes
+    display_differences(other_changes, "Other")
