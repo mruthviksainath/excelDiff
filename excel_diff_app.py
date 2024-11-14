@@ -2,12 +2,11 @@ import streamlit as st
 import pandas as pd
 from openpyxl import load_workbook
 
-
 def compare_excel_sheets(original_excel_path, user_excel_path):
     # Load both Excel files
     original_wb = load_workbook(original_excel_path, data_only=True)
     user_wb = load_workbook(user_excel_path, data_only=True)
-
+    
     # Initialize lists to store different types of changes
     boolean_changes = []
     other_changes = []
@@ -32,7 +31,7 @@ def compare_excel_sheets(original_excel_path, user_excel_path):
             for row_idx in range(max_rows):
                 original_row = original_df.iloc[row_idx].fillna("").tolist()
                 user_row = user_df.iloc[row_idx].fillna("").tolist()
-
+                
                 if original_row != user_row:
                     row_diff = {
                         "Sheet": sheet_name,
@@ -42,14 +41,13 @@ def compare_excel_sheets(original_excel_path, user_excel_path):
                     }
 
                     # Check if changes are only true/false or other types
-                    if all(isinstance(old, bool) and isinstance(new, bool) and old != new
+                    if all(isinstance(old, bool) and isinstance(new, bool) and old != new 
                            for old, new in zip(original_row, user_row) if old != new):
                         boolean_changes.append(row_diff)
                     else:
                         other_changes.append(row_diff)
 
     return boolean_changes, other_changes
-
 
 def highlight_row_differences(old_row, new_row):
     """Return a highlighted new row where differences are marked in green."""
@@ -60,7 +58,6 @@ def highlight_row_differences(old_row, new_row):
         else:
             highlighted_row.append(str(new_val))
     return highlighted_row
-
 
 # Streamlit interface
 st.title("Excel Sheet Difference Checker")
@@ -77,26 +74,21 @@ if original_file and user_file:
     # Compare the Excel files and retrieve the differences
     boolean_changes, other_changes = compare_excel_sheets(original_file, user_file)
 
-
     # Display results
     def display_differences(differences, change_type):
-        if differences:
-            st.write(f"### {change_type} Changes")
-            for diff in differences:
-                st.write(f"**Sheet:** {diff['Sheet']} - **Row:** {diff['Row']}")
+        change_count = len(differences)
+        st.write(f"### {change_type} Changes ({change_count} changes found)")
+        for diff in differences:
+            st.write(f"**Sheet:** {diff['Sheet']} - **Row:** {diff['Row']}")
 
-                # Display rows in a two-row format
-                df_display = pd.DataFrame([diff["Old"], highlight_row_differences(diff["Old"], diff["New"])],
-                                          index=["Old Row", "New Row"])
-                st.write(df_display.to_html(escape=False), unsafe_allow_html=True)
+            # Display rows in a two-row format
+            df_display = pd.DataFrame([diff["Old"], highlight_row_differences(diff["Old"], diff["New"])], index=["Old Row", "New Row"])
+            st.write(df_display.to_html(escape=False), unsafe_allow_html=True)
 
-                st.write("---")
-        else:
-            st.write(f"No {change_type.lower()} changes found.")
-
-
-    # Display Boolean changes
+            st.write("---")
+    
+    # Display Boolean changes with count
     display_differences(boolean_changes, "Boolean")
 
-    # Display Other changes
+    # Display Other changes with count
     display_differences(other_changes, "Other")
