@@ -1,10 +1,10 @@
 import streamlit as st
 import requests
 
-#SQA and LQA templates to copy from
+# SQA, LQA, and PSA templates to copy from
 sqa_template_ids = [19215, 19214, 19213, 19216]
-lqa_template_ids = [20533, 20534, 20535, 20536]  # LQA is mostly used by mariani group!!!
-
+lqa_template_ids = [20533, 20534, 20535, 20536]  # LQA is mostly used by Mariani group!!!
+psa_template_ids = [21732, 21733, 21734]  # Replace with actual PSA template IDs
 
 env_urls = {
     "Dev": "https://dev.siterecon.ai/api/emporio/v2/note-template/clone",
@@ -12,33 +12,35 @@ env_urls = {
     "Prod": "https://app.siterecon.ai/api/emporio/v2/note-template/clone"
 }
 
-##auth for the API
+# Auth for the API
 auth_token = "e5c1fdd8e34e0b1b96fb2df6c5a70bf07f237797"
 csrf_token = "SvxKN2HYw7OTM9AbFITmUWQ8mplS7ZuuBVk1U6bdQBwyuvYU6NLvOqwMYwnMZDm3"
 
-#steamlit ui
-st.title("Utility: Add SQA/LQA Template")
+# Streamlit UI
+st.title("Utility: Add SQA/LQA/PSA Template")
 
-#selecting env
+# Selecting environment
 environment = st.selectbox("Select Environment", ["Dev", "QA", "Prod"])
 api_url = env_urls[environment]
 
-#enteting workspace id
+# Entering workspace ID
 workspace_id = st.number_input("Enter Target Workspace ID")
 
 # Display selected environment and workspace ID
 st.write(f"### Selected Environment: {environment}")
 st.write(f"### Workspace ID: {workspace_id}")
 
-# Step 3: Select template type (SQA or LQA)
+# Step 3: Select template type (SQA, LQA, or PSA)
 st.write("### Choose Template Type")
-template_type = st.radio("Select Template Type", ["SQA", "LQA"])
+template_type = st.radio("Select Template Type", ["SQA", "LQA", "PSA"])
 
 # Determine template list based on selection
 if template_type == "SQA":
     template_ids = sqa_template_ids
 elif template_type == "LQA":
     template_ids = lqa_template_ids
+elif template_type == "PSA":
+    template_ids = psa_template_ids
 else:
     template_ids = []
 
@@ -67,8 +69,4 @@ if st.button("Clone Templates"):
 
         st.write("All templates processed.")
 
-
-
-
-
-##run command streamlit run template_clone.py
+# Run command: streamlit run template_clone.py
