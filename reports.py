@@ -2,17 +2,15 @@ import pandas as pd
 import streamlit as st
 import matplotlib.pyplot as plt
 import requests
-from io import StringIO
 
 # Load the dataset from GitHub
 @st.cache
 def load_data_from_github(url):
     response = requests.get(url)
     if response.status_code == 200:
-        csv_data = StringIO(response.text)
-        return pd.read_csv(csv_data)
+        return pd.read_csv(url)
     else:
-        st.error("Failed to fetch data from GitHub. Please check the file URL.")
+        st.error("Failed to load data from GitHub. Please check the file URL.")
         return pd.DataFrame()
 
 # Summarize report counts
@@ -50,7 +48,7 @@ def main():
     st.markdown("### Analyze report counts for various companies")
 
     # GitHub raw URL for the CSV file
-    github_url = "https://raw.githubusercontent.com/mruthviksainath/excelDiff/main/query_result_2024-12-11T07_54_17.36189Z.csv"
+    github_url = "https://github.com/mruthviksainath/excelDiff/blob/main/query_result_2024-12-11T07_54_17.36189Z.csv"
 
     # Load the data
     data = load_data_from_github(github_url)
@@ -81,13 +79,38 @@ def main():
     valid_years = [col for col in range(2021, 2025) if col in summary.columns]
     summary = summary.reindex(columns=valid_years, fill_value=0)
 
-    # Highlight reductions in the table
+    # Highlight reductions and increases in the table
     summary['Reduction'] = summary[2023] > summary[2024]
+    summary['Increase'] = summary[2024] > summary[2023]
+
     def highlight_reduction(val):
         return 'background-color: red' if val else ''
 
-    styled_summary = summary.style.applymap(highlight_reduction, subset=['Reduction']).format(na_rep='-')
+    def highlight_increase(val):
+        return 'background-color: green' if val else ''
+
+    styled_summary = summary.style.applymap(highlight_reduction, subset=['Reduction']).applymap(highlight_increase, subset=['Increase']).format(na_rep='-')
     st.write(styled_summary)
+
+    # Table showing workspaces with reduced report counts in 2024
+    st.markdown("### Workspaces with Reduced Report Counts in 2024")
+    reduced_workspaces = summary[summary['Reduction']].copy()
+    reduced_workspaces['Difference'] = reduced_workspaces[2024] - reduced_workspaces[2023]
+
+    if not reduced_workspaces.empty:
+        st.dataframe(reduced_workspaces[[2023, 2024, 'Difference']])
+    else:
+        st.write("No workspaces have reduced report counts in 2024 compared to 2023.")
+
+    # Table showing workspaces with increased report counts in 2024
+    st.markdown("### Workspaces with Increased Report Counts in 2024")
+    increased_workspaces = summary[summary['Increase']].copy()
+    increased_workspaces['Difference'] = increased_workspaces[2024] - increased_workspaces[2023]
+
+    if not increased_workspaces.empty:
+        st.dataframe(increased_workspaces[[2023, 2024, 'Difference']])
+    else:
+        st.write("No workspaces have increased report counts in 2024 compared to 2023.")
 
 if __name__ == "__main__":
     main()
