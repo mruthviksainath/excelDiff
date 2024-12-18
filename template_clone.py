@@ -77,56 +77,112 @@ environment = st.selectbox("Select Environment", ["Dev", "QA", "Prod"])
 
 # 2. Enter Target Workspace ID (for cloning and mapping)
 workspace_id = st.number_input("Enter Target Workspace ID (for cloning/mapping)", min_value=1, step=1)
-
+st.markdown("""
+---
+""")
+col1,col2 = st.columns(2)
 # 3. Choose Template Type
-st.write("### Choose Template Type")
-template_type = st.radio("Select Template Type", ["SQA", "LQA", "PSA"])
+with col1:
+    st.write("### Choose Template Type")
+    template_type = st.radio("Select Template Type", ["SQA", "LQA", "PSA"])
 
-if template_type == "SQA":
-    template_ids = sqa_template_ids
-elif template_type == "LQA":
-    template_ids = lqa_template_ids
-elif template_type == "PSA":
-    template_ids = psa_template_ids
-else:
-    template_ids = []
-
-# 4. Clone Templates Button
-if st.button("Clone Templates"):
-    if not workspace_id:
-        st.error("Please enter a valid Target Workspace ID.")
+    if template_type == "SQA":
+        template_ids = sqa_template_ids
+    elif template_type == "LQA":
+        template_ids = lqa_template_ids
+    elif template_type == "PSA":
+        template_ids = psa_template_ids
     else:
-        # Reset before cloning
-        st.session_state["cloned_template_ids"] = []
-        api_url = env_clone_urls[environment]
-        headers = {
-            "Authorization": f"token {auth_token}",
-            "Content-Type": "application/json"
-        }
+        template_ids = []
 
-        for tid in template_ids:
-            payload = {
-                "templateId": tid,
-                "workspaceId": workspace_id
+    # 4. Clone Templates Button
+    if st.button("Clone Templates"):
+        if not workspace_id:
+            st.error("Please enter a valid Target Workspace ID.")
+        else:
+            # Reset before cloning
+            st.session_state["cloned_template_ids"] = []
+            api_url = env_clone_urls[environment]
+            headers = {
+                "Authorization": f"token {auth_token}",
+                "Content-Type": "application/json"
             }
-            response = requests.post(api_url, json=payload, headers=headers)
 
-            # Assuming success returns JSON with a "template" object and "id"
-            if response.status_code == 200:
-                data = response.json()
-                cloned_id = data.get("template", {}).get("id")
-                if cloned_id:
-                    st.session_state["cloned_template_ids"].append(cloned_id)
-                    st.success(f"Template {tid} cloned successfully. New template.id: {cloned_id}")
+            for tid in template_ids:
+                payload = {
+                    "templateId": tid,
+                    "workspaceId": workspace_id
+                }
+                response = requests.post(api_url, json=payload, headers=headers)
+
+                if response.status_code == 200:
+                    data = response.json()
+                    cloned_id = data.get("template", {}).get("id")
+                    if cloned_id:
+                        st.session_state["cloned_template_ids"].append(cloned_id)
+                        st.success(f"Template {tid} cloned successfully. New template.id: {cloned_id}")
+                    else:
+                        st.warning(f"Template {tid} cloned, but 'template.id' not found in response.")
                 else:
-                    st.warning(f"Template {tid} cloned, but 'template.id' not found in response.")
-            else:
-                st.error(f"Failed to clone Template {tid}. Status: {response.status_code}, Message: {response.text}")
+                    st.error(f"Failed to clone Template {tid}. Status: {response.status_code}, Message: {response.text}")
 
-        if st.session_state["cloned_template_ids"]:
-            st.write("Cloned Template IDs:", st.session_state["cloned_template_ids"])
+            if st.session_state["cloned_template_ids"]:
+                st.write("Cloned Template IDs:", st.session_state["cloned_template_ids"])
+
+st.markdown("""
+---
+""")
+# Section to Clone Specific Templates
+with col2:
+    st.write("### Clone Selected Templates")
+    template_ids_input = st.text_input(
+        "Enter Template IDs to Clone (separated by commas)",
+        placeholder="e.g., 19215, 20533, 21732"
+    )
+
+    if st.button("Clone Selected Templates"):
+        if not template_ids_input or not workspace_id:
+            st.error("Please enter valid Template IDs and ensure Target Workspace ID is set.")
+        else:
+            # Parse the input template IDs
+            input_template_ids = [tid.strip() for tid in template_ids_input.split(",") if tid.strip().isdigit()]
+            if not input_template_ids:
+                st.error("No valid Template IDs were found in your input. Please check and try again.")
+            else:
+                st.session_state["cloned_template_ids"] = []  # Reset before cloning
+                api_url = env_clone_urls[environment]
+                headers = {
+                    "Authorization": f"token {auth_token}",
+                    "Content-Type": "application/json"
+                }
+
+                for tid in input_template_ids:
+                    payload = {
+                        "templateId": int(tid),
+                        "workspaceId": workspace_id
+                    }
+                    response = requests.post(api_url, json=payload, headers=headers)
+
+                    if response.status_code == 200:
+                        data = response.json()
+                        cloned_id = data.get("template", {}).get("id")
+                        if cloned_id:
+                            st.session_state["cloned_template_ids"].append(cloned_id)
+                            st.success(f"Template {tid} cloned successfully. New template.id: {cloned_id}")
+                        else:
+                            st.warning(f"Template {tid} cloned, but 'template.id' not found in response.")
+                    else:
+                        st.error(f"Failed to clone Template {tid}. Status: {response.status_code}, Message: {response.text}")
+
+                # Show final cloned template IDs
+                if st.session_state["cloned_template_ids"]:
+                    st.write("### Cloned Template IDs:")
+                    st.write(", ".join(map(str, st.session_state["cloned_template_ids"])))
 
 # 5. Separate input for fetching reportStyles from a different workspace
+st.markdown("""
+---
+""")
 report_styles_workspace_id = st.number_input("Enter Workspace ID for fetching reportStyles", min_value=1, step=1)
 
 if st.button("Fetch Report Styles"):
@@ -151,6 +207,9 @@ if st.button("Fetch Report Styles"):
         else:
             st.error(f"Failed to fetch report styles. Status: {resp.status_code}, Message: {resp.text}")
 
+st.markdown("""
+---
+""")
 # 6. Fetch templates from the template API and display them
 st.write("### Fetching Available Templates from API")
 def fetch_templates(api_key):
@@ -203,6 +262,10 @@ else:
     st.warning("No templates available to display.")
     selected_template = None
 
+st.markdown("""
+---
+""")
+
 # 7. MAP templates to Report ID (Selected Template)
 st.write("## Mapping Details")
 # Show all cloned template IDs
@@ -242,3 +305,6 @@ if st.button("MAP templates to Report ID"):
             st.success("Templates mapped successfully.")
         else:
             st.error(f"Failed to map templates. Status: {resp.status_code}, Message: {resp.text}")
+
+
+
