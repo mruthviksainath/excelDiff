@@ -80,7 +80,7 @@ workspace_id = st.number_input("Enter Target Workspace ID (for cloning/mapping)"
 st.markdown("""
 ---
 """)
-col1,col2 = st.columns(2)
+col1, col2 = st.columns(2)
 # 3. Choose Template Type
 with col1:
     st.write("### Choose Template Type")
@@ -124,7 +124,8 @@ with col1:
                     else:
                         st.warning(f"Template {tid} cloned, but 'template.id' not found in response.")
                 else:
-                    st.error(f"Failed to clone Template {tid}. Status: {response.status_code}, Message: {response.text}")
+                    st.error(
+                        f"Failed to clone Template {tid}. Status: {response.status_code}, Message: {response.text}")
 
             if st.session_state["cloned_template_ids"]:
                 st.write("Cloned Template IDs:", st.session_state["cloned_template_ids"])
@@ -172,17 +173,41 @@ with col2:
                         else:
                             st.warning(f"Template {tid} cloned, but 'template.id' not found in response.")
                     else:
-                        st.error(f"Failed to clone Template {tid}. Status: {response.status_code}, Message: {response.text}")
+                        st.error(
+                            f"Failed to clone Template {tid}. Status: {response.status_code}, Message: {response.text}")
 
                 # Show final cloned template IDs
                 if st.session_state["cloned_template_ids"]:
                     st.write("### Cloned Template IDs:")
                     st.write(", ".join(map(str, st.session_state["cloned_template_ids"])))
 
+# Add new section for manually adding template IDs
+st.markdown("---")
+st.write("### Manually Add Template IDs")
+manual_template_id = st.number_input("Enter Template ID", min_value=1, step=1)
+
+if st.button("Add Template ID"):
+    if manual_template_id:
+        if "cloned_template_ids" not in st.session_state:
+            st.session_state["cloned_template_ids"] = []
+        if manual_template_id not in st.session_state["cloned_template_ids"]:
+            st.session_state["cloned_template_ids"].append(manual_template_id)
+            st.success(f"Template ID {manual_template_id} added successfully!")
+        else:
+            st.warning("This Template ID is already in the list!")
+
+    # Display current list of template IDs
+    if st.session_state["cloned_template_ids"]:
+        st.write("Current Template IDs:")
+        st.write(", ".join(map(str, st.session_state["cloned_template_ids"])))
+
+# Add button to clear template IDs
+if st.button("Clear All Template IDs"):
+    st.session_state["cloned_template_ids"] = []
+    st.success("All Template IDs cleared!")
+
 # 5. Separate input for fetching reportStyles from a different workspace
-st.markdown("""
----
-""")
+
 report_styles_workspace_id = st.number_input("Enter Workspace ID for fetching reportStyles", min_value=1, step=1)
 
 if st.button("Fetch Report Styles"):
@@ -212,6 +237,8 @@ st.markdown("""
 """)
 # 6. Fetch templates from the template API and display them
 st.write("### Fetching Available Templates from API")
+
+
 def fetch_templates(api_key):
     headers = {
         "Content-Type": "application/json",
@@ -223,6 +250,7 @@ def fetch_templates(api_key):
     else:
         st.error(f"Failed to fetch templates. Status code: {response.status_code}")
         return []
+
 
 templates = fetch_templates(template_api_key)
 if templates:
@@ -261,10 +289,6 @@ if templates:
 else:
     st.warning("No templates available to display.")
     selected_template = None
-
-st.markdown("""
----
-""")
 
 # 7. MAP templates to Report ID (Selected Template)
 st.write("## Mapping Details")
@@ -305,6 +329,3 @@ if st.button("MAP templates to Report ID"):
             st.success("Templates mapped successfully.")
         else:
             st.error(f"Failed to map templates. Status: {resp.status_code}, Message: {resp.text}")
-
-
-
