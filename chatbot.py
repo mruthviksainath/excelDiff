@@ -74,63 +74,47 @@ def load_data():
 # Load data before any UI elements
 df = load_data()
 
-# Sidebar
-with st.sidebar:
-    st.image("https://siterecon.ai/wp-content/uploads/2023/03/SiteRecon-Logo-1.png", width=200)
-    st.markdown("## Site Visit Tracker")
-    
-    # Date filter options
-    st.markdown("### Date Range")
-    date_option = st.selectbox(
-        "Select time period",
-        ["Last 7 days", "Last 30 days", "Last 90 days", "Custom"]
-    )
-    
-    if date_option == "Custom":
-        start_date = st.date_input("Start date")
-        end_date = st.date_input("End date")
-    
-    # Property filter
-    st.markdown("### Filters")
-    property_filter = st.checkbox("My Properties Only")
-    
-    # Add more filters as needed
-    state_filter = st.multiselect("States", ["All States"] + sorted(df['propertyState'].unique().tolist()))
-    
-    # Creator filter
-    creator_filter = st.multiselect("Report Creators", ["All Creators"] + sorted(df['reportCreatorName'].unique().tolist()))
-    
-    # Apply filters button
-    apply_filters = st.button("Apply Filters", type="primary")
+# Sidebar - simplified version without filters
+# with st.sidebar:
+#     st.image("https://siterecon.ai/wp-content/uploads/2023/03/SiteRecon-Logo-1.png", width=200)
+#     st.markdown("## Site Visit Tracker")
 
 # Main content
 st.markdown('<div class="main-header">Site Visit Analysis Dashboard</div>', unsafe_allow_html=True)
 
 # Load and process the dataset
-@st.cache_data
-def load_data():
-    df = pd.read_json('/Users/ruthvik/Desktop/site_visit_tracker_df.json')
-    df['reportCreatedAt'] = pd.to_datetime(df['reportCreatedAt'])
-    df['orderPlacedAt'] = pd.to_datetime(df['orderPlacedAt'])
+# @st.cache_data
+# def load_data():
+#     df = pd.read_json('/Users/ruthvik/Desktop/site_visit_tracker_df.json')
     
-    # Fill NA values in string columns to prevent filtering issues
-    string_columns = ['propertyState', 'propertyCity', 'propertyAddress', 'reportCreatorName', 'propertyName']
-    for col in string_columns:
-        if col in df.columns:
-            df[col] = df[col].fillna('')
+#     # Convert datetime columns with error handling
+#     for col in ['reportCreatedAt', 'orderPlacedAt']:
+#         try:
+#             # First try with default parsing
+#             df[col] = pd.to_datetime(df[col])
+#         except ValueError:
+#             # If that fails, try with errors='coerce' to handle mixed formats
+#             df[col] = pd.to_datetime(df[col], errors='coerce')
     
-    # Ensure proper data types for key columns
-    df['propertyState'] = df['propertyState'].astype(str)
-    df['propertyCity'] = df['propertyCity'].astype(str)
-    df['propertyAddress'] = df['propertyAddress'].astype(str)
-    df['propertyName'] = df['propertyName'].astype(str)
+#     # Fill NA values in string columns
+#     string_columns = ['propertyState', 'propertyCity', 'propertyAddress', 'reportCreatorName', 'propertyName']
+#     for col in string_columns:
+#         if col in df.columns:
+#             df[col] = df[col].fillna('')
     
-    return df
+#     # Ensure proper data types for key columns
+#     df['propertyState'] = df['propertyState'].astype(str)
+#     df['propertyCity'] = df['propertyCity'].astype(str)
+#     df['propertyAddress'] = df['propertyAddress'].astype(str)
+#     df['propertyName'] = df['propertyName'].astype(str)
+    
+#     return df
 
-df = load_data()
+# df = load_data()
 
 # OpenAI API Key
-OPENAI_API_KEY = "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"
+OPENAI_API_KEY = "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"
+# OPENAI_API_KEY ="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"
 
 # Fine-Tuned Model ID
 MODEL_ID = "ft:gpt-3.5-turbo-0125:siterecon::B4o7ZKcW"
@@ -270,25 +254,34 @@ def ask_openai(user_input):
             response_format={"type": "json_object"}
         )
         
-        # Get token usage
-        input_tokens = response.usage.prompt_tokens
-        output_tokens = response.usage.completion_tokens
-        total_tokens = response.usage.total_tokens
+        # Get token usage with proper type checking
+        if hasattr(response, 'usage') and response.usage is not None:
+            input_tokens = getattr(response.usage, 'prompt_tokens', 0)
+            output_tokens = getattr(response.usage, 'completion_tokens', 0)
+            total_tokens = getattr(response.usage, 'total_tokens', 0)
+            
+            # Calculate cost
+            input_cost = (input_tokens * 0.0010) / 1000
+            output_cost = (output_tokens * 0.0020) / 1000
+            total_cost = input_cost + output_cost
+            
+            # Parse response with type checking
+            if (hasattr(response, 'choices') and 
+                response.choices and 
+                hasattr(response.choices[0], 'message') and 
+                response.choices[0].message and 
+                response.choices[0].message.content):
+                
+                result = json.loads(response.choices[0].message.content)
+                
+                return result, {
+                    "input_tokens": input_tokens,
+                    "output_tokens": output_tokens,
+                    "total_tokens": total_tokens,
+                    "total_cost": total_cost
+                }
         
-        # Calculate cost
-        input_cost = (input_tokens * 0.0010) / 1000
-        output_cost = (output_tokens * 0.0020) / 1000
-        total_cost = input_cost + output_cost
-        
-        # Parse response
-        result = json.loads(response.choices[0].message.content)
-        
-        return result, {
-            "input_tokens": input_tokens,
-            "output_tokens": output_tokens,
-            "total_tokens": total_tokens,
-            "total_cost": total_cost
-        }
+        return None, None
         
     except Exception as e:
         st.error(f"Error: {str(e)}")
@@ -297,39 +290,8 @@ def ask_openai(user_input):
 # Create tabs
 tab1, tab2, tab3 = st.tabs(["Dashboard", "Query Assistant", "Data Explorer"])
 
-# Apply filters to the dataframe
+# Use the full dataset for all visualizations and queries
 filtered_df = df.copy()
-
-if apply_filters:
-    # Date filtering
-    today = pd.Timestamp.now().normalize()
-    if date_option == "Last 7 days":
-        filtered_df = filtered_df[filtered_df['reportCreatedAt'] >= (today - pd.Timedelta(days=7))]
-    elif date_option == "Last 30 days":
-        filtered_df = filtered_df[filtered_df['reportCreatedAt'] >= (today - pd.Timedelta(days=30))]
-    elif date_option == "Last 90 days":
-        filtered_df = filtered_df[filtered_df['reportCreatedAt'] >= (today - pd.Timedelta(days=90))]
-    elif date_option == "Custom" and 'start_date' in locals() and 'end_date' in locals():
-        start = pd.Timestamp(start_date)
-        end = pd.Timestamp(end_date) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)  # End of the selected day
-        filtered_df = filtered_df[(filtered_df['reportCreatedAt'] >= start) & (filtered_df['reportCreatedAt'] <= end)]
-    
-    # State filtering
-    if state_filter and "All States" not in state_filter:
-        filtered_df = filtered_df[filtered_df['propertyState'].isin(state_filter)]
-    
-    # Creator filtering
-    if creator_filter and "All Creators" not in creator_filter:
-        filtered_df = filtered_df[filtered_df['reportCreatorName'].isin(creator_filter)]
-    
-    # Add notification that filters are applied
-    st.success(f"Filters applied! Showing {len(filtered_df)} of {len(df)} records.")
-else:
-    # If filters not applied, use the full dataset
-    filtered_df = df
-
-# Use filtered_df instead of df for all visualizations and queries
-# Update the dashboard to use filtered_df
 
 with tab1:
     # Dashboard tab
@@ -337,17 +299,17 @@ with tab1:
     
     with col1:
         st.markdown('<div class="section-header">Total Properties</div>', unsafe_allow_html=True)
-        total_properties = filtered_df['propertyName'].nunique()
+        total_properties = df['propertyName'].nunique()
         st.markdown(f"<h1 style='text-align: center; color: #3B82F6;'>{total_properties}</h1>", unsafe_allow_html=True)
     
     with col2:
         st.markdown('<div class="section-header">Total Reports</div>', unsafe_allow_html=True)
-        total_reports = len(filtered_df)
+        total_reports = len(df)
         st.markdown(f"<h1 style='text-align: center; color: #3B82F6;'>{total_reports}</h1>", unsafe_allow_html=True)
     
     with col3:
         st.markdown('<div class="section-header">Open Issues</div>', unsafe_allow_html=True)
-        open_issues = filtered_df['openNoteCount'].sum() if 'openNoteCount' in filtered_df.columns else 0
+        open_issues = df['openNoteCount'].sum() if 'openNoteCount' in df.columns else 0
         st.markdown(f"<h1 style='text-align: center; color: #3B82F6;'>{open_issues}</h1>", unsafe_allow_html=True)
     
     # Charts
@@ -367,36 +329,52 @@ with tab1:
     
     with col1:
         st.markdown('<div class="section-header">Reports Over Time</div>', unsafe_allow_html=True)
-        if 'reportCreatedAt' in df.columns:
-            df['month'] = df['reportCreatedAt'].dt.strftime('%Y-%m')
-            monthly_reports = df.groupby('month').size()
-            fig, ax = plt.subplots(figsize=(10, 6))
-            monthly_reports.plot(kind='line', marker='o', ax=ax)
-            plt.title('Reports Created by Month')
-            plt.xlabel('Month')
-            plt.ylabel('Number of Reports')
-            plt.xticks(rotation=45)
-            plt.tight_layout()
-            st.pyplot(fig)
+        if 'reportCreatedAt' in filtered_df.columns:
+            # Use filtered_df instead of df
+            filtered_df['month'] = filtered_df['reportCreatedAt'].dt.strftime('%Y-%m')
+            monthly_reports = filtered_df.groupby('month').size()
+            
+            if not monthly_reports.empty:
+                fig, ax = plt.subplots(figsize=(10, 6))
+                monthly_reports.plot(kind='line', marker='o', ax=ax)
+                plt.title('Reports Created by Month')
+                plt.xlabel('Month')
+                plt.ylabel('Number of Reports')
+                plt.xticks(rotation=45)
+                plt.tight_layout()
+                st.pyplot(fig)
+                plt.close()
+            else:
+                st.info("No data available for the selected time period")
     
     with col2:
         st.markdown('<div class="section-header">Top Report Creators</div>', unsafe_allow_html=True)
-        if 'reportCreatorName' in df.columns:
-            creator_counts = df['reportCreatorName'].value_counts().head(10)
-            fig, ax = plt.subplots(figsize=(10, 6))
-            creator_counts.plot(kind='barh', ax=ax)
-            plt.title('Top 10 Report Creators')
-            plt.xlabel('Number of Reports')
-            plt.ylabel('Creator Name')
-            plt.tight_layout()
-            st.pyplot(fig)
+        if 'reportCreatorName' in filtered_df.columns:
+            # Use filtered_df instead of df
+            creator_counts = filtered_df['reportCreatorName'].value_counts().head(10)
+            
+            if not creator_counts.empty:
+                fig, ax = plt.subplots(figsize=(10, 6))
+                creator_counts.plot(kind='barh', ax=ax)
+                plt.title('Top 10 Report Creators')
+                plt.xlabel('Number of Reports')
+                plt.ylabel('Creator Name')
+                plt.tight_layout()
+                st.pyplot(fig)
+                plt.close()
+            else:
+                st.info("No data available for the selected filters")
 
 with tab2:
     # Query Assistant tab
     st.markdown('<div class="section-header">Ask Questions About Your Data</div>', unsafe_allow_html=True)
     st.markdown('<div class="info-box">Ask questions in natural language about your site visit data. For example: "Show me the top 5 properties with the most reports" or "What are the trends in site visits over the last 3 months?"</div>', unsafe_allow_html=True)
     
-    user_query = st.text_input("Enter your question:", placeholder="e.g., Show me properties with open issues")
+    # Get user query from session state if available, otherwise use empty string
+    user_query = st.session_state.get('user_query', '') 
+    
+    # Text input with the value from session state
+    user_query = st.text_input("Enter your question:", value=user_query, placeholder="e.g., Show me properties with open issues")
     
     if st.button("Submit Query", type="primary"):
         with st.spinner("Analyzing your data..."):
@@ -440,20 +418,16 @@ with tab2:
                     labels = table_data.get("labels", [])
                     
                     for query, label in zip(queries, labels):
-                        if query.strip():
+                        if isinstance(query, str) and query.strip():  # Add type check
                             try:
                                 query_result = eval(query.strip())
                                 st.markdown(f"**{label}**")
                                 
                                 # Convert reportUrl column to clickable links
-                                if 'reportUrl' in query_result.columns:
-                                    # Create a copy to avoid modifying the original dataframe
+                                if isinstance(query_result, pd.DataFrame) and 'reportUrl' in query_result.columns:
                                     display_df = query_result.copy()
-                                    
-                                    # Convert URLs to clickable links
                                     def make_clickable(url):
                                         return f'<a href="{url}" target="_blank">Report</a>'
-                                    
                                     display_df['reportUrl'] = display_df['reportUrl'].apply(make_clickable)
                                     st.write(display_df.to_html(escape=False), unsafe_allow_html=True)
                                 else:
@@ -486,7 +460,7 @@ with tab2:
                     for i, question in enumerate(result["followup_questions"], 1):
                         if st.button(f"{question}", key=f"followup_{i}"):
                             st.session_state.user_query = question
-                            st.experimental_rerun()
+                            st.rerun()
 
 with tab3:
     # Data Explorer tab
