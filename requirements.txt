@@ -3,3 +3,8 @@ openpyxl
 pandas
 matplotlib
 requests
+streamlit
+openai
+pandas
+matplotlib
+pillow
